@@ -1,4 +1,4 @@
-const CACHE = 'mein-deutsch-v1';
+const CACHE = 'mein-deutsch-v2';
 const FILES = ['./', './index.html', './app.js', './style.css', './dict.js',
                './manifest.json', './icons/icon.svg', './icons/icon-maskable.svg'];
 
@@ -15,5 +15,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (!e.request.url.startsWith(self.location.origin)) return;
+  // Network first dla sw.js żeby zawsze sprawdzać aktualizacje
+  if (e.request.url.includes('sw.js')) return;
   e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request)));
 });
