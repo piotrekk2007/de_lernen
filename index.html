@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mein Deutsch</title>
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#1e3a5f" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Mein Deutsch" />
+  <link rel="apple-touch-icon" href="./icons/icon.svg" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ========== NAWIGACJA ========== -->
+<nav id="navbar">
+  <div class="nav-brand" onclick="showView('home')">🇩🇪 Mein Deutsch</div>
+  <div class="nav-links">
+    <button onclick="showView('home')" class="nav-btn">Dom</button>
+    <button onclick="showView('sets-list')" class="nav-btn">Słówka</button>
+    <button onclick="showView('songs-list')" class="nav-btn">Piosenki</button>
+    <button onclick="showView('texts-list')" class="nav-btn">Teksty</button>
+    <button onclick="showView('progress')" class="nav-btn">Postępy</button>
+    <button onclick="saveAll()" class="nav-btn nav-btn-save">Zapisz wszystko</button>
+    <button onclick="loadAll()" class="nav-btn">Wczytaj</button>
+  </div>
+</nav>
+<input type="file" id="load-all-file" accept=".json" style="display:none" onchange="handleLoadAll(event)" />
+
+<!-- ========== WIDOK: STRONA GŁÓWNA ========== -->
+<div id="view-home" class="view">
+  <div class="home-hero">
+    <div class="hero-greeting" id="hero-greeting">Guten Tag! 👋</div>
+    <div class="hero-streak" id="hero-streak"></div>
+  </div>
+  <div class="home-tiles">
+    <div class="tile tile-navy" onclick="showView('sets-list')">
+      <div class="tile-icon">📚</div>
+      <div class="tile-title">Słówka</div>
+      <div class="tile-desc">Ucz się i sprawdzaj</div>
+    </div>
+    <div class="tile tile-navylt" onclick="showView('songs-list')">
+      <div class="tile-icon">🎵</div>
+      <div class="tile-title">Piosenki</div>
+      <div class="tile-desc">Ucz się z muzyki</div>
+    </div>
+    <div class="tile tile-amber" onclick="showView('texts-list')">
+      <div class="tile-icon">📰</div>
+      <div class="tile-title">Teksty</div>
+      <div class="tile-desc">Czytaj po niemiecku</div>
+    </div>
+    <div class="tile tile-green" onclick="showView('progress')">
+      <div class="tile-icon">🏆</div>
+      <div class="tile-title">Postępy</div>
+      <div class="tile-desc">Wyniki i odznaki</div>
+    </div>
+  </div>
+  <div class="home-recent" id="home-recent"></div>
+</div>
+
+<!-- ========== WIDOK: LISTA ZESTAWÓW ========== -->
+<div id="view-sets-list" class="view" style="display:none">
+  <div class="view-header">
+    <h1>📚 Moje zestawy słówek</h1>
+    <div class="header-actions">
+      <button class="btn btn-primary" onclick="showView('set-edit', {id:null})">+ Nowy zestaw</button>
+      <button class="btn btn-secondary" onclick="importSet()">Importuj</button>
+    </div>
+  </div>
+  <div id="sets-grid" class="sets-grid"></div>
+  <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)" />
+</div>
+
+<!-- ========== WIDOK: EDYTOR ZESTAWU ========== -->
+<div id="view-set-edit" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="showView('sets-list')">← Wróć</button>
+    <h1 id="set-edit-title">Nowy zestaw</h1>
+  </div>
+  <div class="edit-form">
+    <div class="form-row">
+      <label>Nazwa zestawu</label>
+      <input type="text" id="set-name-input" placeholder="np. Kolory, Liczby..." class="big-input" />
+    </div>
+    <div class="form-row">
+      <label>Emoji zestawu</label>
+      <div class="emoji-picker" id="emoji-picker"></div>
+    </div>
+    <div class="words-table-header">
+      <span>Deutsch</span>
+      <span>Polski</span>
+      <span></span>
+    </div>
+    <div id="words-table"></div>
+    <button class="btn btn-ghost add-word-btn" onclick="addWordRow()">+ Dodaj słówko</button>
+    <div class="bulk-area">
+      <details>
+        <summary>Wklej wiele słówek naraz</summary>
+        <p class="hint">Wpisz każde słówko w osobnej linii: <code>deutsch = polski</code></p>
+        <textarea id="bulk-input" rows="8" placeholder="Haus = dom&#10;Auto = samochód&#10;Buch = książka"></textarea>
+        <button class="btn btn-secondary" onclick="parseBulk()">Dodaj wszystkie</button>
+      </details>
+    </div>
+    <div class="edit-actions">
+      <button class="btn btn-primary" onclick="saveSet()">Zapisz zestaw</button>
+      <button class="btn btn-secondary" onclick="exportSet()">Eksportuj JSON</button>
+      <button class="btn btn-danger" id="delete-set-btn" onclick="deleteSet()" style="display:none">Usuń zestaw</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== WIDOK: SZCZEGÓŁY ZESTAWU ========== -->
+<div id="view-set-detail" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="showView('sets-list')">← Wróć</button>
+    <h1 id="set-detail-title"></h1>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-ghost" onclick="editCurrentSet()">Edytuj</button>
+      <button class="btn btn-danger" onclick="deleteCurrentSet()">Usuń</button>
+    </div>
+  </div>
+  <div class="set-stats" id="set-detail-stats"></div>
+  <div class="set-actions">
+    <button class="btn btn-large btn-navy" onclick="startLearn()">📖 Nauka</button>
+    <button class="btn btn-large btn-primary" onclick="startTest()">✏️ Test</button>
+    <button class="btn btn-large btn-secondary" onclick="startHangman()">🪢 Wisielec</button>
+    <button class="btn btn-large btn-green" onclick="startMatch()">🃏 Dopasuj pary</button>
+  </div>
+  <div class="words-preview" id="set-words-preview"></div>
+</div>
+
+<!-- ========== WIDOK: NAUKA ========== -->
+<div id="view-learn" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="exitLearn()">← Wróć</button>
+    <h1 id="learn-title">Nauka</h1>
+    <button class="btn btn-secondary" id="learn-swap-btn" onclick="toggleLearnSwap()">🔄 Zamień kierunek</button>
+  </div>
+  <div class="learn-direction-badge" id="learn-direction-badge"></div>
+  <div class="learn-progress-bar">
+    <div class="learn-progress-fill" id="learn-progress-fill"></div>
+  </div>
+  <div class="learn-counter" id="learn-counter"></div>
+  <div class="learn-card" id="learn-card">
+    <div class="learn-word" id="learn-word"></div>
+    <div class="learn-hint" id="learn-hint"></div>
+    <input type="text" id="learn-input" class="learn-answer-input" placeholder="Wpisz odpowiedź..."
+      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+      onkeyup="if(event.key==='Enter') checkLearnAnswer();" />
+    <button class="btn btn-primary btn-large" id="learn-check-btn" onclick="checkLearnAnswer()">Sprawdź ✓</button>
+    <div class="learn-feedback" id="learn-feedback" style="display:none">
+      <div class="feedback-icon" id="feedback-icon"></div>
+      <div class="feedback-text" id="feedback-text"></div>
+      <button class="btn btn-primary" tabindex="-1" onclick="nextLearnWord()">Dalej →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== WIDOK: TEST ========== -->
+<div id="view-test" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="exitTest()">← Wróć</button>
+    <h1 id="test-title">Test</h1>
+    <button class="btn btn-secondary" id="test-swap-btn" onclick="toggleTestSwap()">🔄 Zamień kierunek</button>
+  </div>
+  <div class="learn-direction-badge" id="test-direction-badge"></div>
+  <div class="learn-progress-bar">
+    <div class="learn-progress-fill" id="test-progress-fill"></div>
+  </div>
+  <div class="learn-counter" id="test-counter"></div>
+  <div class="learn-card" id="test-card">
+    <div class="learn-word" id="test-word"></div>
+    <input type="text" id="test-input" class="learn-answer-input" placeholder="Wpisz odpowiedź..."
+      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+      onkeyup="if(event.key==='Enter') checkTestAnswer();" />
+    <button class="btn btn-primary btn-large" id="test-check-btn" onclick="checkTestAnswer()">Sprawdź ✓</button>
+    <div class="learn-feedback" id="test-feedback" style="display:none">
+      <div class="feedback-icon" id="test-feedback-icon"></div>
+      <div class="feedback-text" id="test-feedback-text"></div>
+      <button class="btn btn-primary" tabindex="-1" onclick="nextTestWord()">Dalej →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== WIDOK: WISIELEC ========== -->
+<div id="view-hangman" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="exitHangman()">← Wróć</button>
+    <h1 id="hangman-title">🪢 Wisielec</h1>
+    <span id="hangman-score-badge" class="score-badge"></span>
+  </div>
+  <div class="hangman-layout">
+    <div class="hangman-figure-wrap">
+      <svg id="hangman-svg" viewBox="0 0 120 160" width="120" height="160">
+        <line x1="10" y1="155" x2="110" y2="155" stroke="#1e3a5f" stroke-width="4" stroke-linecap="round"/>
+        <line x1="30"  y1="155" x2="30"  y2="10"  stroke="#1e3a5f" stroke-width="4" stroke-linecap="round"/>
+        <line x1="30"  y1="10"  x2="80"  y2="10"  stroke="#1e3a5f" stroke-width="4" stroke-linecap="round"/>
+        <line x1="80"  y1="10"  x2="80"  y2="30"  stroke="#1e3a5f" stroke-width="4" stroke-linecap="round"/>
+        <circle id="h-head" cx="80" cy="42" r="12" stroke="#c8941a" stroke-width="3" fill="none" style="display:none"/>
+        <line id="h-body" x1="80" y1="54" x2="80" y2="100" stroke="#c8941a" stroke-width="3" stroke-linecap="round" style="display:none"/>
+        <line id="h-larm" x1="80" y1="65" x2="58" y2="85" stroke="#c8941a" stroke-width="3" stroke-linecap="round" style="display:none"/>
+        <line id="h-rarm" x1="80" y1="65" x2="102" y2="85" stroke="#c8941a" stroke-width="3" stroke-linecap="round" style="display:none"/>
+        <line id="h-lleg" x1="80" y1="100" x2="60" y2="128" stroke="#c8941a" stroke-width="3" stroke-linecap="round" style="display:none"/>
+        <line id="h-rleg" x1="80" y1="100" x2="100" y2="128" stroke="#c8941a" stroke-width="3" stroke-linecap="round" style="display:none"/>
+      </svg>
+      <div class="hangman-wrong-count" id="hangman-wrong-count"></div>
+    </div>
+    <div class="hangman-right">
+      <div class="hangman-clue" id="hangman-clue"></div>
+      <div class="hangman-word" id="hangman-word"></div>
+      <div class="hangman-wrong-letters" id="hangman-wrong-letters"></div>
+      <div class="hangman-keyboard" id="hangman-keyboard"></div>
+      <div class="hangman-result" id="hangman-result" style="display:none">
+        <div class="hangman-result-icon" id="hangman-result-icon"></div>
+        <div class="hangman-result-text" id="hangman-result-text"></div>
+        <button class="btn btn-primary btn-large" onclick="nextHangmanWord()">Następne słówko →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== WIDOK: DOPASUJ PARY ========== -->
+<div id="view-match" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="exitMatch()">← Wróć</button>
+    <h1 id="match-title">🃏 Dopasuj pary</h1>
+    <span id="match-score-badge" class="score-badge"></span>
+  </div>
+  <div class="match-info-bar">
+    <span id="match-pairs-left"></span>
+    <span id="match-moves"></span>
+  </div>
+  <div id="match-grid" class="match-grid"></div>
+  <div id="match-complete" style="display:none" class="match-complete">
+    <div class="result-emoji" id="match-result-emoji"></div>
+    <h2 id="match-result-title"></h2>
+    <div id="match-result-stats" class="result-score"></div>
+    <div class="result-actions">
+      <button class="btn btn-primary btn-large" onclick="startMatch()">Zagraj jeszcze raz</button>
+      <button class="btn btn-secondary" onclick="exitMatch()">← Wróć do zestawu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== WIDOK: WYNIK TESTU ========== -->
+<div id="view-test-result" class="view" style="display:none">
+  <div class="result-container">
+    <div class="result-emoji" id="result-emoji"></div>
+    <h1 id="result-title"></h1>
+    <div class="result-score" id="result-score"></div>
+    <div class="result-stars" id="result-stars"></div>
+    <div class="result-details" id="result-details"></div>
+    <div class="result-actions">
+      <button class="btn btn-primary btn-large" onclick="startTest()">Spróbuj ponownie</button>
+      <button class="btn btn-secondary" onclick="showView('set-detail', {id: currentSetId})">Wyniki zestawu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== WIDOK: LISTA PIOSENEK ========== -->
+<div id="view-songs-list" class="view" style="display:none">
+  <div class="view-header">
+    <h1>🎵 Moje piosenki</h1>
+    <button class="btn btn-primary" onclick="showView('song-edit', {id:null})">+ Dodaj piosenkę</button>
+  </div>
+  <div id="songs-grid" class="sets-grid"></div>
+</div>
+
+<!-- ========== WIDOK: EDYTOR PIOSENKI ========== -->
+<div id="view-song-edit" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="showView('songs-list')">← Wróć</button>
+    <h1 id="song-edit-title">Nowa piosenka</h1>
+  </div>
+  <div class="edit-form">
+    <div class="form-row">
+      <label>Tytuł piosenki</label>
+      <input type="text" id="song-title-input" placeholder="np. Rammstein — Du hast" class="big-input" />
+    </div>
+    <div class="form-row">
+      <label>Wykonawca</label>
+      <input type="text" id="song-artist-input" placeholder="np. Rammstein" class="big-input" />
+    </div>
+    <div class="form-row">
+      <label>Link YouTube (opcjonalnie)</label>
+      <input type="text" id="song-yt-input" placeholder="Wklej link YouTube lub kod &lt;iframe&gt;" class="big-input" />
+    </div>
+    <div class="form-row">
+      <label>Tekst piosenki po niemiecku (każda zwrotka w osobnym bloku, oddzielone pustą linią)</label>
+      <textarea id="song-de-input" rows="12" placeholder="Du hast&#10;Du hast mich&#10;&#10;Du hast mich gefragt"></textarea>
+    </div>
+    <div class="form-row">
+      <label>Tłumaczenie po polsku (te same zwrotki w tej samej kolejności)</label>
+      <textarea id="song-pl-input" rows="12" placeholder="Masz&#10;Masz mnie&#10;&#10;Zapytałaś mnie"></textarea>
+    </div>
+    <div class="edit-actions">
+      <button class="btn btn-primary" onclick="saveSong()">Zapisz piosenkę</button>
+      <button class="btn btn-danger" id="delete-song-btn" onclick="deleteSong()" style="display:none">Usuń</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== WIDOK: PIOSENKA ========== -->
+<div id="view-song-detail" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="showView('songs-list')">← Wróć</button>
+    <h1 id="song-detail-title"></h1>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-ghost" onclick="editCurrentSong()">Edytuj</button>
+      <button class="btn btn-danger" onclick="deleteCurrentSong()">Usuń</button>
+    </div>
+  </div>
+  <div id="song-yt-player" class="yt-player"></div>
+  <div class="song-controls">
+    <button class="btn btn-navy" onclick="showView('song-translate', {id: currentSongId})">✍️ Tłumacz</button>
+    <button class="btn btn-secondary" id="reveal-all-btn" onclick="revealAll()">Pokaż tłumaczenia</button>
+    <button class="btn btn-secondary" onclick="hideAll()">Ukryj tłumaczenia</button>
+    <button class="btn btn-primary" onclick="extractWordsFromSong()">📚 Słówka do nauki</button>
+  </div>
+  <div id="song-verses" class="song-verses"></div>
+</div>
+
+<!-- ========== WIDOK: TŁUMACZENIE PIOSENKI ========== -->
+<div id="view-song-translate" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="showView('song-detail', {id: currentSongId})">← Wróć</button>
+    <h1 id="translate-title">✍️ Tłumacz</h1>
+  </div>
+  <p class="hint" style="margin-bottom:18px">Przeczytaj każdą zwrotkę po niemiecku i wpisz swoje tłumaczenie.</p>
+  <div id="translate-yt-player" class="yt-player"></div>
+  <div id="translate-verses" class="song-verses"></div>
+  <div class="edit-actions" style="margin-top:20px">
+    <button class="btn btn-primary btn-large" onclick="saveTranslation()">Zapisz tłumaczenie</button>
+  </div>
+</div>
+
+<!-- ========== WIDOK: WYCIĄGANIE SŁÓWEK Z PIOSENKI ========== -->
+<div id="view-song-extract" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" id="extract-back-btn" onclick="showView('song-detail', {id: currentSongId})">← Wróć</button>
+    <h1>📚 Wyciągnij słówka</h1>
+  </div>
+  <p class="hint">Kliknij na słowa niemieckie, które chcesz dodać do zestawu słówek:</p>
+  <div id="extract-text" class="extract-text"></div>
+  <div id="extract-selected" class="extract-selected">
+    <h3>Wybrane słówka:</h3>
+    <div id="selected-words-list"></div>
+  </div>
+  <div class="edit-actions">
+    <div class="form-row">
+      <label>Nazwa nowego zestawu</label>
+      <input type="text" id="extract-set-name" class="big-input" placeholder="np. Słówka z piosenki" />
+    </div>
+    <button class="btn btn-primary" onclick="saveExtractedWords()">Zapisz jako zestaw</button>
+  </div>
+</div>
+
+<!-- ========== WIDOK: LISTA TEKSTÓW ========== -->
+<div id="view-texts-list" class="view" style="display:none">
+  <div class="view-header">
+    <h1>📰 Moje teksty</h1>
+    <button class="btn btn-primary" onclick="showView('text-edit', {id:null})">+ Dodaj tekst</button>
+  </div>
+  <div id="texts-grid" class="sets-grid"></div>
+</div>
+
+<!-- ========== WIDOK: EDYTOR TEKSTU ========== -->
+<div id="view-text-edit" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="showView('texts-list')">← Wróć</button>
+    <h1 id="text-edit-title">Nowy tekst</h1>
+  </div>
+  <div class="edit-form">
+    <div class="form-row">
+      <label>Tytuł tekstu</label>
+      <input type="text" id="text-title-input" placeholder="np. Artykuł z Der Spiegel" class="big-input" />
+    </div>
+    <div class="form-row">
+      <label>Źródło (opcjonalnie)</label>
+      <input type="text" id="text-source-input" placeholder="np. Der Spiegel, 2024" class="big-input" />
+    </div>
+    <div class="form-row">
+      <label>Tekst po niemiecku (każdy akapit oddzielony pustą linią)</label>
+      <textarea id="text-de-input" rows="14" placeholder="Deutschland ist ein Land in Mitteleuropa.&#10;&#10;Es hat etwa 84 Millionen Einwohner."></textarea>
+    </div>
+    <div class="form-row">
+      <label>Tłumaczenie polskie (opcjonalnie, te same akapity w tej samej kolejności)</label>
+      <textarea id="text-pl-input" rows="14" placeholder="Niemcy to kraj w środkowej Europie.&#10;&#10;Ma około 84 miliony mieszkańców."></textarea>
+    </div>
+    <div class="edit-actions">
+      <button class="btn btn-primary" onclick="saveText()">Zapisz tekst</button>
+      <button class="btn btn-danger" id="delete-text-btn" onclick="deleteText()" style="display:none">Usuń tekst</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== WIDOK: CZYTANIE TEKSTU ========== -->
+<div id="view-text-detail" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="showView('texts-list')">← Wróć</button>
+    <h1 id="text-detail-title"></h1>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-ghost" onclick="editCurrentText()">Edytuj</button>
+      <button class="btn btn-danger" onclick="deleteCurrentText()">Usuń</button>
+    </div>
+  </div>
+  <div id="text-detail-source" class="text-source-line"></div>
+  <div class="text-controls">
+    <button class="btn btn-navy" onclick="showView('text-translate', {id: currentTextId})">✍️ Tłumacz</button>
+    <button class="btn btn-secondary" onclick="revealAllParas()">Pokaż tłumaczenia</button>
+    <button class="btn btn-secondary" onclick="hideAllParas()">Ukryj tłumaczenia</button>
+    <button class="btn btn-primary" onclick="extractWordsFromText()">📚 Wyciągnij słówka</button>
+  </div>
+  <div id="text-paragraphs" class="text-paragraphs"></div>
+</div>
+
+<!-- ========== WIDOK: TŁUMACZENIE TEKSTU ========== -->
+<div id="view-text-translate" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="showView('text-detail', {id: currentTextId})">← Wróć</button>
+    <h1 id="text-translate-title">✍️ Tłumacz tekst</h1>
+  </div>
+  <p class="hint" style="margin-bottom:18px">Przeczytaj każdy akapit po niemiecku i wpisz swoje tłumaczenie.</p>
+  <div id="text-translate-paras"></div>
+  <div class="edit-actions" style="margin-top:20px">
+    <button class="btn btn-primary btn-large" onclick="saveTextTranslation()">Zapisz tłumaczenie</button>
+  </div>
+</div>
+
+<!-- ========== WIDOK: WYCIĄGANIE SŁÓWEK Z TEKSTU ========== -->
+<div id="view-text-extract" class="view" style="display:none">
+  <div class="view-header">
+    <button class="btn btn-ghost" onclick="showView('text-detail', {id: currentTextId})">← Wróć</button>
+    <h1>📚 Wyciągnij słówka i frazy</h1>
+  </div>
+  <p class="hint">Kliknij słowo aby je zaznaczyć. Kliknij i przeciągnij przez kilka słów aby zaznaczyć frazę.</p>
+  <div id="text-extract-content" class="extract-text"></div>
+  <div id="text-extract-selected" class="extract-selected">
+    <h3>Wybrane słówka i frazy:</h3>
+    <div id="text-selected-list"></div>
+  </div>
+  <div class="edit-actions">
+    <div class="form-row">
+      <label>Nazwa nowego zestawu</label>
+      <input type="text" id="text-extract-set-name" class="big-input" placeholder="np. Słówka z artykułu" />
+    </div>
+    <button class="btn btn-primary" onclick="saveExtractedTextWords()">Zapisz jako zestaw</button>
+  </div>
+</div>
+
+<!-- ========== WIDOK: POSTĘPY ========== -->
+<div id="view-progress" class="view" style="display:none">
+  <div class="view-header">
+    <h1>🏆 Moje postępy</h1>
+  </div>
+  <div class="progress-streak" id="progress-streak"></div>
+  <div class="badges-section">
+    <h2>Odznaki</h2>
+    <div id="badges-grid" class="badges-grid"></div>
+  </div>
+  <div class="history-section">
+    <h2>Historia testów</h2>
+    <div id="test-history" class="test-history"></div>
+  </div>
+</div>
+
+<!-- ========== MODAL ========== -->
+<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<!-- ========== TOAST ========== -->
+<div id="toast" class="toast" style="display:none"></div>
+
+<!-- ========== FLOATING TRANSLATE BUTTON ========== -->
+<div id="selection-translate-btn" style="display:none">Tłumacz zaznaczenie</div>
+
+<script src="dict.js"></script>
+<script src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js');
+    });
+  }
+</script>
+</body>
+</html>
