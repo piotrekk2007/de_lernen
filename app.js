@@ -766,9 +766,36 @@ function renderExtract(id) {
   document.getElementById('extract-set-name').value = song.title ? `Słówka z "${song.title}"` : 'Słówka z piosenki';
 }
 
+// ===== GEMINI API =====
+function getGeminiKey() { return localStorage.getItem('gemini_api_key') || ''; }
+function saveGeminiKey(k) { localStorage.setItem('gemini_api_key', k.trim()); }
+
+async function fetchTranslationGemini(phrase, apiKey) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `Przetłumacz poniższe niemieckie słowo lub zwrot na język polski. Podaj TYLKO tłumaczenie, nic więcej. Jeśli jest kilka znaczeń, rozdziel je ukośnikiem. Słowo/zwrot: "${phrase}"` }] }]
+      })
+    }
+  );
+  const data = await res.json();
+  const t = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  return t || '';
+}
+
 async function fetchTranslation(word) {
   const w = word.toLowerCase();
   if (typeof OFFLINE_DICT !== 'undefined' && OFFLINE_DICT[w]) return OFFLINE_DICT[w];
+  const key = getGeminiKey();
+  if (key) {
+    try {
+      const t = await fetchTranslationGemini(word, key);
+      if (t) return t;
+    } catch {}
+  }
   try {
     const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=de|pl`);
     const data = await res.json();
@@ -776,6 +803,35 @@ async function fetchTranslation(word) {
     if (t && t.toLowerCase() !== w) return t;
   } catch {}
   return '';
+}
+
+function openApiSettings() {
+  const currentKey = getGeminiKey();
+  const masked = currentKey ? currentKey.slice(0, 8) + '••••••••••••••••' : '';
+  showModal('⚙️ Ustawienia — klucz Gemini API', '', [
+    { label: 'Zapisz', cls: 'btn-primary', action: () => {
+      const input = document.getElementById('gemini-key-input');
+      if (input) {
+        saveGeminiKey(input.value);
+        showToast(input.value.trim() ? '✅ Klucz Gemini zapisany!' : 'Klucz usunięty.');
+      }
+      closeModal();
+    }},
+    { label: 'Anuluj', cls: 'btn-secondary', action: closeModal },
+  ]);
+  // inject input into modal body after modal renders
+  setTimeout(() => {
+    const body = document.getElementById('modal-body');
+    if (body) body.innerHTML = `
+      <p style="margin-bottom:12px;font-size:0.9rem;color:var(--text-light)">
+        Klucz Google AI Studio (Gemini). Gdy podany — tłumaczenia słówek i zwrotów używają Gemini 2.0 Flash Lite zamiast MyMemory.
+      </p>
+      <input id="gemini-key-input" type="password" class="big-input"
+        placeholder="AIza..." value="${esc(currentKey)}"
+        style="font-family:monospace;font-size:0.9rem" />
+      ${currentKey ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:6px">Aktualny klucz: ${esc(masked)}</div>` : ''}
+    `;
+  }, 0);
 }
 
 async function toggleExtractWord(word, el) {
@@ -798,11 +854,11 @@ async function toggleExtractWord(word, el) {
 function renderSelectedChips() {
   const list = document.getElementById('selected-words-list');
   list.innerHTML = Object.keys(extractSelectedWords).map(w => `
-    <span class="selected-word-chip">
+    <span class="selected-word-chip" data-key="${esc(w)}">
       <b>${esc(w)}</b> =
       <input type="text" placeholder="tłumaczenie" value="${esc(extractSelectedWords[w])}"
-        oninput="extractSelectedWords[${JSON.stringify(w)}]=this.value" />
-      <span class="chip-remove" onclick="removeExtractChip(${JSON.stringify(w)})">✕</span>
+        oninput="extractSelectedWords[this.closest('.selected-word-chip').dataset.key]=this.value" />
+      <span class="chip-remove" onclick="removeExtractChip(this.closest('.selected-word-chip').dataset.key)">✕</span>
     </span>`).join('');
 }
 
@@ -1113,11 +1169,11 @@ function textExtractMouseUp(event, idx) {
 function renderTextChips() {
   const list = document.getElementById('text-selected-list');
   list.innerHTML = Object.keys(extractTextSelectedItems).map(key => `
-    <span class="selected-word-chip">
+    <span class="selected-word-chip" data-key="${esc(key)}">
       <b>${esc(key)}</b> =
       <input type="text" placeholder="tłumaczenie" value="${esc(extractTextSelectedItems[key])}"
-        oninput="extractTextSelectedItems[${JSON.stringify(key)}]=this.value" />
-      <span class="chip-remove" onclick="removeTextChip(${JSON.stringify(key)})">✕</span>
+        oninput="extractTextSelectedItems[this.closest('.selected-word-chip').dataset.key]=this.value" />
+      <span class="chip-remove" onclick="removeTextChip(this.closest('.selected-word-chip').dataset.key)">✕</span>
     </span>`).join('');
 }
 

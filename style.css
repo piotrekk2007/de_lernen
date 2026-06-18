@@ -76,6 +76,8 @@ body {
   padding: 8px 14px;
 }
 .nav-btn-save:hover { background: var(--amber-light); color: var(--navy); }
+.nav-btn-settings { opacity: 0.75; font-size: 1.1rem; padding: 6px 10px; }
+.nav-btn-settings:hover { opacity: 1; background: rgba(255,255,255,0.15); }
 
 /* ===== VIEWS ===== */
 .view {
